@@ -87,6 +87,14 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 })
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
+  // Verificar si hay movimientos asociados a este ítem
+  const movementsCount = await prisma.movement.count({ where: { itemId: req.params.id } })
+  if (movementsCount > 0) {
+    return res.status(400).json({
+      message: `No se puede eliminar el ítem porque tiene ${movementsCount} movimiento(s) asociado(s)`,
+    })
+  }
+
   await prisma.item.delete({ where: { id: req.params.id } })
   res.status(204).end()
 })

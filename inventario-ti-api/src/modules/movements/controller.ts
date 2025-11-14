@@ -52,6 +52,14 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
 
     const mv = await tx.movement.create({
       data: { itemId, type, quantity, note },
+      include: {
+        item: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
+      },
     })
     await tx.item.update({ where: { id: itemId }, data: { stock: newStock } })
     return mv

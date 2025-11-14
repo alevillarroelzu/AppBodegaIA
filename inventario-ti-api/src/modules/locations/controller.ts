@@ -27,6 +27,14 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 })
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
+  // Verificar si hay ítems usando esta ubicación
+  const itemsCount = await prisma.item.count({ where: { locationId: req.params.id } })
+  if (itemsCount > 0) {
+    return res.status(400).json({
+      message: `No se puede eliminar la ubicación porque ${itemsCount} ítem(s) la están usando`,
+    })
+  }
+
   await prisma.location.delete({ where: { id: req.params.id } })
   res.status(204).end()
 })

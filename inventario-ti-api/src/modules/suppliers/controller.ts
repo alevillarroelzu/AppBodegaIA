@@ -27,6 +27,14 @@ export const update = asyncHandler(async (req: Request, res: Response) => {
 })
 
 export const remove = asyncHandler(async (req: Request, res: Response) => {
+  // Verificar si hay ítems usando este proveedor
+  const itemsCount = await prisma.item.count({ where: { supplierId: req.params.id } })
+  if (itemsCount > 0) {
+    return res.status(400).json({
+      message: `No se puede eliminar el proveedor porque ${itemsCount} ítem(s) lo están usando`,
+    })
+  }
+
   await prisma.supplier.delete({ where: { id: req.params.id } })
   res.status(204).end()
 })
