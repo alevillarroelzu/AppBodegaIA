@@ -63,7 +63,7 @@ export function InventoryProvider({ children }) {
         setLoading(true)
         setError(null)
 
-        const [itemsResponse, locations, suppliers, movements] = await Promise.all([
+        const [itemsResponse, locations, suppliers, movementsResponse] = await Promise.all([
           InventoryService.getItems(),
           InventoryService.getLocations(),
           InventoryService.getSuppliers(),
@@ -72,6 +72,7 @@ export function InventoryProvider({ children }) {
 
         // Si la respuesta incluye paginación, extraer solo los datos
         const items = itemsResponse.data || itemsResponse
+        const movements = movementsResponse.data || movementsResponse
 
         dispatch({ type: 'SET_ITEMS', payload: items })
         dispatch({ type: 'SET_LOCATIONS', payload: locations })

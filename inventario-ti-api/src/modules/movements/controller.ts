@@ -3,8 +3,51 @@ import { Request, Response } from 'express'
 import { asyncHandler } from '../../middlewares/errorHandler'
 import { MovementCreate } from './schema'
 
-export const list = asyncHandler(async (_req: Request, res: Response) => {
+export const list = asyncHandler(async (req: Request, res: Response) => {
+  // Paginación
+  const page = parseInt(req.query.page as string) || 1
+  const limit = parseInt(req.query.limit as string) || 50
+  const skip = (page - 1) * limit
+
+  // Filtros
+  const type = req.query.type as string
+  const itemId = req.query.itemId as string
+  const startDate = req.query.startDate as string
+  const endDate = req.query.endDate as string
+
+  // Construir el where dinámicamente
+  const where: any = {}
+
+  if (type && ['IN', 'OUT', 'ADJ'].includes(type)) {
+    where.type = type
+  }
+
+  if (itemId) {
+    where.itemId = itemId
+  }
+
+  // Filtro por rango de fechas
+  if (startDate || endDate) {
+    where.createdAt = {}
+    if (startDate) {
+      where.createdAt.gte = new Date(startDate)
+    }
+    if (endDate) {
+      // Agregar 1 día para incluir todo el día final
+      const endDateTime = new Date(endDate)
+      endDateTime.setDate(endDateTime.getDate() + 1)
+      where.createdAt.lt = endDateTime
+    }
+  }
+
+  // Obtener total para paginación
+  const total = await prisma.movement.count({ where })
+
+  // Obtener datos
   const data = await prisma.movement.findMany({
+    where,
+    skip,
+    take: limit,
     orderBy: { createdAt: 'desc' },
     include: {
       item: {
@@ -15,7 +58,17 @@ export const list = asyncHandler(async (_req: Request, res: Response) => {
       }
     }
   })
-  res.json(data)
+
+  res.json({
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    }
+  })
 })
 
 export const register = asyncHandler(async (req: Request, res: Response) => {

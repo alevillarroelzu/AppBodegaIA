@@ -12,9 +12,13 @@ import { requestLogger } from './middlewares/requestLogger'
 import { generalLimiter, healthLimiter } from './middlewares/rateLimiter'
 import { logger } from './config/logger'
 import { prisma } from './db/prisma'
+import { setupSwagger } from './config/swagger'
 // import { requireAuth } from './middlewares/auth'
 
 export const app = express()
+
+// Configurar Swagger (documentación de API)
+setupSwagger(app)
 
 // Seguridad HTTP con Helmet
 app.use(helmet())
