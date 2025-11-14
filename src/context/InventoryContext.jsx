@@ -1,24 +1,25 @@
-import { createContext, useContext, useEffect, useMemo, useReducer } from 'react'
-import { useLocalStorage } from '../hooks/useLocalStorage'
+import { createContext, useContext, useEffect, useMemo, useReducer, useState } from 'react'
+import { InventoryService } from '../services/inventory'
 
 const InventoryContext = createContext(null)
 
 const initialState = {
   items: [],
-  locations: [
-    { id: 'LOC-01', name: 'Bodega Central' },
-    { id: 'LOC-02', name: 'Rack Servidores' },
-  ],
-  suppliers: [
-    { id: 'SUP-01', name: 'Proveedor A', email: 'ventas@proveedora.cl' },
-  ],
+  locations: [],
+  suppliers: [],
   movements: [],
 }
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'LOAD_FROM_STORAGE':
-      return { ...state, ...action.payload }
+    case 'SET_ITEMS':
+      return { ...state, items: action.payload }
+    case 'SET_LOCATIONS':
+      return { ...state, locations: action.payload }
+    case 'SET_SUPPLIERS':
+      return { ...state, suppliers: action.payload }
+    case 'SET_MOVEMENTS':
+      return { ...state, movements: action.payload }
     case 'ADD_ITEM':
       return { ...state, items: [action.payload, ...state.items] }
     case 'UPDATE_ITEM': {
@@ -27,38 +28,134 @@ function reducer(state, action) {
     }
     case 'DELETE_ITEM':
       return { ...state, items: state.items.filter((it) => it.id !== action.payload) }
-    case 'REGISTER_MOVEMENT': {
-      const mv = action.payload
-      const items = state.items.map((it) =>
-        it.id === mv.itemId
-          ? { ...it, stock: it.stock + (mv.type === 'IN' ? mv.quantity : mv.type === 'OUT' ? -mv.quantity : mv.quantity) }
-          : it,
-      )
-      return { ...state, items, movements: [mv, ...state.movements] }
-    }
     case 'ADD_LOCATION':
       return { ...state, locations: [action.payload, ...state.locations] }
+    case 'UPDATE_LOCATION': {
+      const locations = state.locations.map((loc) => (loc.id === action.payload.id ? { ...loc, ...action.payload } : loc))
+      return { ...state, locations }
+    }
+    case 'DELETE_LOCATION':
+      return { ...state, locations: state.locations.filter((loc) => loc.id !== action.payload) }
     case 'ADD_SUPPLIER':
       return { ...state, suppliers: [action.payload, ...state.suppliers] }
+    case 'UPDATE_SUPPLIER': {
+      const suppliers = state.suppliers.map((sup) => (sup.id === action.payload.id ? { ...sup, ...action.payload } : sup))
+      return { ...state, suppliers }
+    }
+    case 'DELETE_SUPPLIER':
+      return { ...state, suppliers: state.suppliers.filter((sup) => sup.id !== action.payload) }
+    case 'REGISTER_MOVEMENT':
+      return { ...state, movements: [action.payload, ...state.movements] }
     default:
       return state
   }
 }
 
 export function InventoryProvider({ children }) {
-  const [saved, setSaved] = useLocalStorage('inv-ti', null)
   const [state, dispatch] = useReducer(reducer, initialState)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
+  // Cargar datos iniciales desde la API
   useEffect(() => {
-    if (saved) dispatch({ type: 'LOAD_FROM_STORAGE', payload: saved })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    async function loadData() {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const [itemsResponse, locations, suppliers, movements] = await Promise.all([
+          InventoryService.getItems(),
+          InventoryService.getLocations(),
+          InventoryService.getSuppliers(),
+          InventoryService.getMovements(),
+        ])
+
+        // Si la respuesta incluye paginación, extraer solo los datos
+        const items = itemsResponse.data || itemsResponse
+
+        dispatch({ type: 'SET_ITEMS', payload: items })
+        dispatch({ type: 'SET_LOCATIONS', payload: locations })
+        dispatch({ type: 'SET_SUPPLIERS', payload: suppliers })
+        dispatch({ type: 'SET_MOVEMENTS', payload: movements })
+      } catch (err) {
+        console.error('Error cargando datos:', err)
+        setError(err.message || 'Error al cargar datos')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
   }, [])
 
-  useEffect(() => {
-    setSaved(state)
-  }, [state, setSaved])
+  // Métodos para sincronizar con el backend
+  const actions = useMemo(() => ({
+    // Items
+    async addItem(payload) {
+      const created = await InventoryService.createItem(payload)
+      dispatch({ type: 'ADD_ITEM', payload: created })
+      return created
+    },
+    async updateItem(id, payload) {
+      const updated = await InventoryService.updateItem(id, payload)
+      dispatch({ type: 'UPDATE_ITEM', payload: updated })
+      return updated
+    },
+    async deleteItem(id) {
+      await InventoryService.deleteItem(id)
+      dispatch({ type: 'DELETE_ITEM', payload: id })
+    },
 
-  const value = useMemo(() => ({ state, dispatch }), [state])
+    // Locations
+    async addLocation(payload) {
+      const created = await InventoryService.createLocation(payload)
+      dispatch({ type: 'ADD_LOCATION', payload: created })
+      return created
+    },
+    async updateLocation(id, payload) {
+      const updated = await InventoryService.updateLocation(id, payload)
+      dispatch({ type: 'UPDATE_LOCATION', payload: updated })
+      return updated
+    },
+    async deleteLocation(id) {
+      await InventoryService.deleteLocation(id)
+      dispatch({ type: 'DELETE_LOCATION', payload: id })
+    },
+
+    // Suppliers
+    async addSupplier(payload) {
+      const created = await InventoryService.createSupplier(payload)
+      dispatch({ type: 'ADD_SUPPLIER', payload: created })
+      return created
+    },
+    async updateSupplier(id, payload) {
+      const updated = await InventoryService.updateSupplier(id, payload)
+      dispatch({ type: 'UPDATE_SUPPLIER', payload: updated })
+      return updated
+    },
+    async deleteSupplier(id) {
+      await InventoryService.deleteSupplier(id)
+      dispatch({ type: 'DELETE_SUPPLIER', payload: id })
+    },
+
+    // Movements
+    async registerMovement(payload) {
+      const created = await InventoryService.createMovement(payload)
+      dispatch({ type: 'REGISTER_MOVEMENT', payload: created })
+      // Recargar items para actualizar el stock
+      const items = await InventoryService.getItems()
+      dispatch({ type: 'SET_ITEMS', payload: items })
+      return created
+    },
+  }), [])
+
+  const value = useMemo(() => ({
+    state,
+    dispatch,
+    actions,
+    loading,
+    error
+  }), [state, actions, loading, error])
+
   return <InventoryContext.Provider value={value}>{children}</InventoryContext.Provider>
 }
 

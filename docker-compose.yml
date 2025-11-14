@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: inventario-ti-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inventario_ti
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./inventario-ti-api
+      dockerfile: Dockerfile
+    container_name: inventario-ti-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 8090
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/inventario_ti?schema=public
+      CORS_ORIGIN: http://localhost:5173
+      JWT_SECRET: dev-secret-change-in-production
+      JWT_EXPIRES: 20m
+      JWT_REFRESH_EXPIRES: 7d
+      # AWS S3 (opcional - comentar si no se usa)
+      # APP_ACCESS_KEY_ID: your_key
+      # APP_SECRET_ACCESS_KEY: your_secret
+      # AWS_REGION: us-east-1
+      # AWS_BUCKET: your-bucket
+      # SMTP (opcional - comentar si no se usa)
+      # MAIL_HOST: smtp.gmail.com
+      # MAIL_PORT: 587
+      # MAIL_SECURE: false
+      # MAIL_USER: your-email@gmail.com
+      # MAIL_PASS: your-password
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./inventario-ti-api:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Frontend React
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventario-ti-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_BASE: http://localhost:8090/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+volumes:
+  postgres_data:
+    driver: local
