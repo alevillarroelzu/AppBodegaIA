@@ -1,14 +1,7 @@
 import { prisma } from '../../db/prisma'
-import { z } from 'zod'
 import { Request, Response } from 'express'
 import { asyncHandler } from '../../middlewares/errorHandler'
-
-const MovementCreate = z.object({
-  itemId: z.string(),
-  type: z.enum(['IN','OUT','ADJ']),
-  quantity: z.number().int().positive(),
-  note: z.string().optional(),
-})
+import { MovementCreate } from './schema'
 
 export const list = asyncHandler(async (_req: Request, res: Response) => {
   const data = await prisma.movement.findMany({

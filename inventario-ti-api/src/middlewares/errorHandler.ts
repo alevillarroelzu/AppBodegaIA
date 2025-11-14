@@ -1,9 +1,16 @@
 import { Request, Response, NextFunction } from 'express'
 import { ZodError } from 'zod'
 import { Prisma } from '@prisma/client'
+import { logger } from '../config/logger'
 
-export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
-  console.error('Error:', err)
+export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {
+  // Log del error con contexto
+  logger.error('Error en request:', {
+    method: req.method,
+    path: req.path,
+    error: err.message,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  })
 
   // Errores de validación de Zod
   if (err instanceof ZodError) {
