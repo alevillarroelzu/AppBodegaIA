@@ -141,12 +141,14 @@ export default function ItemsPage() {
       ),
     },
     {
-      key: 'locationId',
+      key: 'location',
       header: 'Ubicación',
-      cell: (r) => {
-        const location = state.locations.find((l) => l.id === r.locationId)
-        return location?.name || '-'
-      },
+      cell: (r) => r.location?.name || '-',
+    },
+    {
+      key: 'supplier',
+      header: 'Proveedor',
+      cell: (r) => r.supplier?.name || '-',
     },
     {
       key: 'actions',

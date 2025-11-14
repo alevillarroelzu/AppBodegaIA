@@ -51,7 +51,13 @@ export const list = asyncHandler(async (req: Request, res: Response) => {
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
   const payload = ItemCreate.parse(req.body)
-  const created = await prisma.item.create({ data: payload })
+  const created = await prisma.item.create({
+    data: payload,
+    include: {
+      location: true,
+      supplier: true,
+    },
+  })
   res.status(201).json(created)
 })
 
@@ -69,7 +75,14 @@ export const get = asyncHandler(async (req: Request, res: Response) => {
 
 export const update = asyncHandler(async (req: Request, res: Response) => {
   const data = ItemUpdate.parse(req.body)
-  const updated = await prisma.item.update({ where: { id: req.params.id }, data })
+  const updated = await prisma.item.update({
+    where: { id: req.params.id },
+    data,
+    include: {
+      location: true,
+      supplier: true,
+    },
+  })
   res.json(updated)
 })
 
