@@ -65,8 +65,14 @@ export default function MovementsPage() {
     )
   }
 
+  const typeLabels = {
+    IN: 'Ingreso',
+    OUT: 'Salida',
+    ADJ: 'Ajuste',
+  }
+
   const columns = [
-    { key: 'type', header: 'Tipo' },
+    { key: 'type', header: 'Tipo', cell: (r) => typeLabels[r.type] || r.type },
     { key: 'itemId', header: 'Ítem', cell: (r) => r.item ? `${r.item.code} · ${r.item.name}` : r.itemId },
     { key: 'quantity', header: 'Cantidad' },
     { key: 'note', header: 'Nota' },
