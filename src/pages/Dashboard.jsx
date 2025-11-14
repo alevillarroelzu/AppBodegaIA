@@ -1,5 +1,8 @@
 import Card from '../components/ui/Card'
 import { useInventory } from '../context/InventoryContext'
+import StockByLocationChart from '../components/charts/StockByLocationChart'
+import MovementsTrendChart from '../components/charts/MovementsTrendChart'
+import StockStatusChart from '../components/charts/StockStatusChart'
 
 export default function Dashboard() {
   const { state, loading, error } = useInventory()
@@ -34,12 +37,23 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold">Dashboard</h2>
+
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card title="Ítems distintos" value={totalItems} subtitle="SKU o códigos únicos" />
         <Card title="Stock total" value={totalStock} subtitle="Unidades en bodega" />
         <Card title="Bajo stock" value={lowStock.length} subtitle="Por debajo del mínimo" />
       </div>
 
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StockByLocationChart items={state.items} locations={state.locations} />
+        <StockStatusChart items={state.items} />
+      </div>
+
+      <MovementsTrendChart movements={state.movements} />
+
+      {/* Últimos movimientos */}
       <section className="card p-4">
         <h3 className="font-medium mb-3">Últimos movimientos</h3>
         <ul className="space-y-2 text-sm">

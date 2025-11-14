@@ -12,6 +12,8 @@ export default function ItemsPage() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
   const q = useDebounce(query)
 
   const filtered = useMemo(() => {
@@ -25,6 +27,24 @@ export default function ItemsPage() {
   const defaultLocation = state.locations[0]?.id || ''
   const [form, setForm] = useState({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
 
+  function openCreateModal() {
+    setEditingItem(null)
+    setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
+    setOpen(true)
+  }
+
+  function openEditModal(item) {
+    setEditingItem(item)
+    setForm({
+      code: item.code,
+      name: item.name,
+      stock: item.stock,
+      minStock: item.minStock,
+      locationId: item.locationId || defaultLocation,
+    })
+    setOpen(true)
+  }
+
   async function submit(e) {
     e.preventDefault()
 
@@ -36,22 +56,51 @@ export default function ItemsPage() {
 
     setSubmitting(true)
     try {
-      await actions.addItem({
-        code: form.code,
-        name: form.name,
-        stock: Number(form.stock || 0),
-        minStock: Number(form.minStock || 0),
-        locationId: form.locationId || undefined,
-      })
+      if (editingItem) {
+        // Editar ítem existente
+        await actions.updateItem(editingItem.id, {
+          code: form.code,
+          name: form.name,
+          stock: Number(form.stock || 0),
+          minStock: Number(form.minStock || 0),
+          locationId: form.locationId || undefined,
+        })
+        toast.success('Ítem actualizado exitosamente')
+      } else {
+        // Crear nuevo ítem
+        await actions.addItem({
+          code: form.code,
+          name: form.name,
+          stock: Number(form.stock || 0),
+          minStock: Number(form.minStock || 0),
+          locationId: form.locationId || undefined,
+        })
+        toast.success('Ítem creado exitosamente')
+      }
 
-      toast.success('Ítem creado exitosamente')
       setOpen(false)
+      setEditingItem(null)
       setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
     } catch (err) {
-      console.error('Error creando ítem:', err)
-      toast.error(err.response?.data?.message || 'Error al crear el ítem')
+      console.error('Error guardando ítem:', err)
+      toast.error(err.response?.data?.message || 'Error al guardar el ítem')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(item) {
+    if (!confirm(`¿Estás seguro de eliminar el ítem "${item.name}"?`)) return
+
+    setDeletingId(item.id)
+    try {
+      await actions.deleteItem(item.id)
+      toast.success('Ítem eliminado exitosamente')
+    } catch (err) {
+      console.error('Error eliminando ítem:', err)
+      toast.error(err.response?.data?.message || 'Error al eliminar el ítem')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -89,7 +138,36 @@ export default function ItemsPage() {
         <span className={r.stock <= r.minStock ? 'text-red-600 font-semibold' : ''}>{r.minStock}</span>
       ),
     },
-    { key: 'locationId', header: 'Ubicación' },
+    {
+      key: 'locationId',
+      header: 'Ubicación',
+      cell: (r) => {
+        const location = state.locations.find((l) => l.id === r.locationId)
+        return location?.name || '-'
+      },
+    },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openEditModal(r)}
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+            disabled={deletingId === r.id}
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => handleDelete(r)}
+            className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+            disabled={deletingId === r.id}
+          >
+            {deletingId === r.id ? 'Eliminando...' : 'Eliminar'}
+          </button>
+        </div>
+      ),
+    },
   ]
 
   return (
@@ -103,14 +181,18 @@ export default function ItemsPage() {
             placeholder="Buscar por código o nombre"
             className="rounded-xl border px-3 py-2 text-sm w-56 border-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-600/30 dark:bg-zinc-900 dark:border-zinc-700"
           />
-          <Button onClick={() => setOpen(true)}>Nuevo Ítem</Button>
+          <Button onClick={openCreateModal}>Nuevo Ítem</Button>
         </div>
       </div>
 
       <Table columns={columns} data={filtered} />
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Crear ítem"
-        footer={<Button onClick={() => setOpen(false)} variant="outline">Cerrar</Button>}>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingItem ? 'Editar ítem' : 'Crear ítem'}
+        footer={<Button onClick={() => setOpen(false)} variant="outline">Cerrar</Button>}
+      >
         <form className="space-y-3" onSubmit={submit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
