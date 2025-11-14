@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useInventory } from '../context/InventoryContext'
+import { useToast } from '../context/ToastContext'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import Table from '../components/ui/Table'
 import { useDebounce } from '../hooks/useDebounce'
 
 export default function ItemsPage() {
-  const { state, dispatch } = useInventory()
+  const { state, actions, loading, error } = useInventory()
+  const toast = useToast()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const q = useDebounce(query)
 
   const filtered = useMemo(() => {
@@ -19,15 +22,60 @@ export default function ItemsPage() {
     )
   }, [state.items, q])
 
-  const [form, setForm] = useState({ code: '', name: '', stock: 0, minStock: 0, locationId: 'LOC-01' })
+  const defaultLocation = state.locations[0]?.id || ''
+  const [form, setForm] = useState({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
-    if (!form.code || !form.name) return alert('Código y nombre son obligatorios')
-    const id = crypto.randomUUID()
-    dispatch({ type: 'ADD_ITEM', payload: { id, ...form, stock: Number(form.stock || 0), minStock: Number(form.minStock || 0) } })
-    setOpen(false)
-    setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: 'LOC-01' })
+
+    // Validación
+    if (!form.code || !form.name) {
+      toast.error('Código y nombre son obligatorios')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await actions.addItem({
+        code: form.code,
+        name: form.name,
+        stock: Number(form.stock || 0),
+        minStock: Number(form.minStock || 0),
+        locationId: form.locationId || undefined,
+      })
+
+      toast.success('Ítem creado exitosamente')
+      setOpen(false)
+      setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
+    } catch (err) {
+      console.error('Error creando ítem:', err)
+      toast.error(err.response?.data?.message || 'Error al crear el ítem')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Manejo de estados de carga y error
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-zinc-600 dark:text-zinc-400">Cargando ítems...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 font-semibold mb-2">Error al cargar los datos</p>
+          <p className="text-zinc-600 dark:text-zinc-400">{error}</p>
+        </div>
+      </div>
+    )
   }
 
   const columns = [
@@ -96,8 +144,12 @@ export default function ItemsPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="submit">Guardar</Button>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+              Cancelar
+            </Button>
           </div>
         </form>
       </Modal>

@@ -142,7 +142,8 @@ export function InventoryProvider({ children }) {
       const created = await InventoryService.createMovement(payload)
       dispatch({ type: 'REGISTER_MOVEMENT', payload: created })
       // Recargar items para actualizar el stock
-      const items = await InventoryService.getItems()
+      const itemsResponse = await InventoryService.getItems()
+      const items = itemsResponse.data || itemsResponse
       dispatch({ type: 'SET_ITEMS', payload: items })
       return created
     },

@@ -2,7 +2,31 @@ import Card from '../components/ui/Card'
 import { useInventory } from '../context/InventoryContext'
 
 export default function Dashboard() {
-  const { state } = useInventory()
+  const { state, loading, error } = useInventory()
+
+  // Manejo de estados de carga y error
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-zinc-600 dark:text-zinc-400">Cargando dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 font-semibold mb-2">Error al cargar los datos</p>
+          <p className="text-zinc-600 dark:text-zinc-400">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
   const totalItems = state.items.length
   const totalStock = state.items.reduce((acc, it) => acc + (it.stock || 0), 0)
   const lowStock = state.items.filter((it) => it.stock <= (it.minStock ?? 0))
@@ -24,7 +48,7 @@ export default function Dashboard() {
               <span>
                 <span className="font-semibold">{m.type}</span> · {m.itemId} · {m.quantity}
               </span>
-              <span className="text-zinc-500">{new Date(m.date).toLocaleString()}</span>
+              <span className="text-zinc-500">{new Date(m.createdAt || m.date).toLocaleString()}</span>
             </li>
           ))}
           {state.movements.length === 0 && <li className="text-zinc-500">Sin movimientos aún.</li>}
