@@ -3,14 +3,30 @@ import { useInventory } from '../context/InventoryContext'
 import { useToast } from '../context/ToastContext'
 import Button from '../components/ui/Button'
 import Table from '../components/ui/Table'
+import Modal from '../components/ui/Modal'
 
 export default function LocationsPage() {
   const { state, actions, loading, error } = useInventory()
   const toast = useToast()
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [editingLocation, setEditingLocation] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
-  async function add(e) {
+  function openCreateModal() {
+    setEditingLocation(null)
+    setName('')
+    setOpen(true)
+  }
+
+  function openEditModal(location) {
+    setEditingLocation(location)
+    setName(location.name)
+    setOpen(true)
+  }
+
+  async function submit(e) {
     e.preventDefault()
 
     if (!name.trim()) {
@@ -20,14 +36,39 @@ export default function LocationsPage() {
 
     setSubmitting(true)
     try {
-      await actions.addLocation({ name: name.trim() })
-      toast.success('Ubicación creada exitosamente')
+      if (editingLocation) {
+        // Editar ubicación existente
+        await actions.updateLocation(editingLocation.id, { name: name.trim() })
+        toast.success('Ubicación actualizada exitosamente')
+      } else {
+        // Crear nueva ubicación
+        await actions.addLocation({ name: name.trim() })
+        toast.success('Ubicación creada exitosamente')
+      }
+
+      setOpen(false)
+      setEditingLocation(null)
       setName('')
     } catch (err) {
-      console.error('Error creando ubicación:', err)
-      toast.error(err.response?.data?.message || 'Error al crear la ubicación')
+      console.error('Error guardando ubicación:', err)
+      toast.error(err.response?.data?.message || 'Error al guardar la ubicación')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(location) {
+    if (!confirm(`¿Estás seguro de eliminar la ubicación "${location.name}"?`)) return
+
+    setDeletingId(location.id)
+    try {
+      await actions.deleteLocation(location.id)
+      toast.success('Ubicación eliminada exitosamente')
+    } catch (err) {
+      console.error('Error eliminando ubicación:', err)
+      toast.error(err.response?.data?.message || 'Error al eliminar la ubicación')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -54,23 +95,68 @@ export default function LocationsPage() {
     )
   }
 
+  const columns = [
+    { key: 'name', header: 'Nombre' },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openEditModal(r)}
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+            disabled={deletingId === r.id}
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => handleDelete(r)}
+            className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+            disabled={deletingId === r.id}
+          >
+            {deletingId === r.id ? 'Eliminando...' : 'Eliminar'}
+          </button>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Ubicaciones</h2>
-      <form onSubmit={add} className="card p-4 flex items-center gap-3">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre de ubicación"
-          disabled={submitting}
-          className="rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
-        />
-        <Button type="submit" disabled={submitting}>
-          {submitting ? 'Agregando...' : 'Agregar'}
-        </Button>
-      </form>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Ubicaciones</h2>
+        <Button onClick={openCreateModal}>Nueva Ubicación</Button>
+      </div>
 
-      <Table columns={[{ key: 'name', header: 'Nombre' }]} data={state.locations} />
+      <Table columns={columns} data={state.locations} />
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingLocation ? 'Editar ubicación' : 'Crear ubicación'}
+        footer={<Button onClick={() => setOpen(false)} variant="outline">Cerrar</Button>}
+      >
+        <form className="space-y-3" onSubmit={submit}>
+          <div>
+            <label className="text-sm">Nombre *</label>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre de ubicación"
+              disabled={submitting}
+              className="w-full rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

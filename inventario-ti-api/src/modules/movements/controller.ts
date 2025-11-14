@@ -1,6 +1,7 @@
 import { prisma } from '../../db/prisma'
 import { z } from 'zod'
 import { Request, Response } from 'express'
+import { asyncHandler } from '../../middlewares/errorHandler'
 
 const MovementCreate = z.object({
   itemId: z.string(),
@@ -9,27 +10,44 @@ const MovementCreate = z.object({
   note: z.string().optional(),
 })
 
-export async function register(req: Request, res: Response) {
+export const list = asyncHandler(async (_req: Request, res: Response) => {
+  const data = await prisma.movement.findMany({
+    orderBy: { createdAt: 'desc' },
+    include: {
+      item: {
+        select: {
+          code: true,
+          name: true,
+        }
+      }
+    }
+  })
+  res.json(data)
+})
+
+export const register = asyncHandler(async (req: Request, res: Response) => {
   const { itemId, type, quantity, note } = MovementCreate.parse(req.body)
 
   const result = await prisma.$transaction(async (tx) => {
     // Bloqueo de fila del ítem para evitar carreras de stock.
-    // Usamos SQL nativo: SELECT ... FOR UPDATE.
-    await tx.$executeRawUnsafe(
-      `SELECT id FROM "Item" WHERE id = $1 FOR UPDATE`,
-      itemId
-    )
+    await tx.$executeRaw`SELECT id FROM "Item" WHERE id = ${itemId} FOR UPDATE`
 
     const item = await tx.item.findUnique({ where: { id: itemId } })
     if (!item) throw new Error('Item not found')
 
     let newStock = item.stock
-    if (type === 'IN') newStock += quantity
-    else if (type === 'OUT') {
+    if (type === 'IN') {
+      newStock += quantity
+    } else if (type === 'OUT') {
       if (item.stock < quantity) throw new Error('Insufficient stock')
       newStock -= quantity
-    } else { // ADJ: ajuste (positivo o negativo)
+    } else {
+      // ADJ: ajuste (puede ser positivo o negativo)
       newStock += quantity
+      // Validar que el stock no quede negativo después del ajuste
+      if (newStock < 0) {
+        throw new Error(`Adjustment would result in negative stock. Current: ${item.stock}, Adjustment: ${quantity}, Result: ${newStock}`)
+      }
     }
 
     const mv = await tx.movement.create({
@@ -40,4 +58,4 @@ export async function register(req: Request, res: Response) {
   })
 
   res.status(201).json(result)
-}
+})

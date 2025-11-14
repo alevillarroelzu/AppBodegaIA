@@ -67,10 +67,10 @@ export default function MovementsPage() {
 
   const columns = [
     { key: 'type', header: 'Tipo' },
-    { key: 'itemId', header: 'Ítem' },
+    { key: 'itemId', header: 'Ítem', cell: (r) => r.item ? `${r.item.code} · ${r.item.name}` : r.itemId },
     { key: 'quantity', header: 'Cantidad' },
     { key: 'note', header: 'Nota' },
-    { key: 'date', header: 'Fecha', cell: (r) => new Date(r.date).toLocaleString() },
+    { key: 'createdAt', header: 'Fecha', cell: (r) => new Date(r.createdAt || r.date).toLocaleString() },
   ]
 
   return (

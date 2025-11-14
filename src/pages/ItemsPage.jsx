@@ -24,12 +24,11 @@ export default function ItemsPage() {
     )
   }, [state.items, q])
 
-  const defaultLocation = state.locations[0]?.id || ''
-  const [form, setForm] = useState({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
+  const [form, setForm] = useState({ code: '', name: '', stock: 0, minStock: 0, locationId: '', supplierId: '' })
 
   function openCreateModal() {
     setEditingItem(null)
-    setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
+    setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: '', supplierId: '' })
     setOpen(true)
   }
 
@@ -40,7 +39,8 @@ export default function ItemsPage() {
       name: item.name,
       stock: item.stock,
       minStock: item.minStock,
-      locationId: item.locationId || defaultLocation,
+      locationId: item.locationId || '',
+      supplierId: item.supplierId || '',
     })
     setOpen(true)
   }
@@ -64,6 +64,7 @@ export default function ItemsPage() {
           stock: Number(form.stock || 0),
           minStock: Number(form.minStock || 0),
           locationId: form.locationId || undefined,
+          supplierId: form.supplierId || undefined,
         })
         toast.success('Ítem actualizado exitosamente')
       } else {
@@ -74,13 +75,14 @@ export default function ItemsPage() {
           stock: Number(form.stock || 0),
           minStock: Number(form.minStock || 0),
           locationId: form.locationId || undefined,
+          supplierId: form.supplierId || undefined,
         })
         toast.success('Ítem creado exitosamente')
       }
 
       setOpen(false)
       setEditingItem(null)
-      setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: defaultLocation })
+      setForm({ code: '', name: '', stock: 0, minStock: 0, locationId: '', supplierId: '' })
     } catch (err) {
       console.error('Error guardando ítem:', err)
       toast.error(err.response?.data?.message || 'Error al guardar el ítem')
@@ -219,8 +221,19 @@ export default function ItemsPage() {
               <label className="text-sm">Ubicación</label>
               <select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value })}
                 className="w-full rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700">
+                <option value="">Sin ubicación</option>
                 {state.locations.map((l) => (
                   <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm">Proveedor</label>
+              <select value={form.supplierId} onChange={(e) => setForm({ ...form, supplierId: e.target.value })}
+                className="w-full rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700">
+                <option value="">Sin proveedor</option>
+                {state.suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
             </div>

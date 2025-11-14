@@ -3,14 +3,30 @@ import { useInventory } from '../context/InventoryContext'
 import { useToast } from '../context/ToastContext'
 import Button from '../components/ui/Button'
 import Table from '../components/ui/Table'
+import Modal from '../components/ui/Modal'
 
 export default function SuppliersPage() {
   const { state, actions, loading, error } = useInventory()
   const toast = useToast()
   const [form, setForm] = useState({ name: '', email: '' })
   const [submitting, setSubmitting] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [editingSupplier, setEditingSupplier] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
-  async function add(e) {
+  function openCreateModal() {
+    setEditingSupplier(null)
+    setForm({ name: '', email: '' })
+    setOpen(true)
+  }
+
+  function openEditModal(supplier) {
+    setEditingSupplier(supplier)
+    setForm({ name: supplier.name, email: supplier.email || '' })
+    setOpen(true)
+  }
+
+  async function submit(e) {
     e.preventDefault()
 
     if (!form.name.trim()) {
@@ -26,17 +42,45 @@ export default function SuppliersPage() {
 
     setSubmitting(true)
     try {
-      await actions.addSupplier({
-        name: form.name.trim(),
-        email: form.email.trim() || undefined,
-      })
-      toast.success('Proveedor creado exitosamente')
+      if (editingSupplier) {
+        // Editar proveedor existente
+        await actions.updateSupplier(editingSupplier.id, {
+          name: form.name.trim(),
+          email: form.email.trim() || undefined,
+        })
+        toast.success('Proveedor actualizado exitosamente')
+      } else {
+        // Crear nuevo proveedor
+        await actions.addSupplier({
+          name: form.name.trim(),
+          email: form.email.trim() || undefined,
+        })
+        toast.success('Proveedor creado exitosamente')
+      }
+
+      setOpen(false)
+      setEditingSupplier(null)
       setForm({ name: '', email: '' })
     } catch (err) {
-      console.error('Error creando proveedor:', err)
-      toast.error(err.response?.data?.message || 'Error al crear el proveedor')
+      console.error('Error guardando proveedor:', err)
+      toast.error(err.response?.data?.message || 'Error al guardar el proveedor')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete(supplier) {
+    if (!confirm(`¿Estás seguro de eliminar el proveedor "${supplier.name}"?`)) return
+
+    setDeletingId(supplier.id)
+    try {
+      await actions.deleteSupplier(supplier.id)
+      toast.success('Proveedor eliminado exitosamente')
+    } catch (err) {
+      console.error('Error eliminando proveedor:', err)
+      toast.error(err.response?.data?.message || 'Error al eliminar el proveedor')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -63,33 +107,80 @@ export default function SuppliersPage() {
     )
   }
 
+  const columns = [
+    { key: 'name', header: 'Nombre' },
+    { key: 'email', header: 'Email', cell: (r) => r.email || '-' },
+    {
+      key: 'actions',
+      header: 'Acciones',
+      cell: (r) => (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => openEditModal(r)}
+            className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+            disabled={deletingId === r.id}
+          >
+            Editar
+          </button>
+          <button
+            onClick={() => handleDelete(r)}
+            className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+            disabled={deletingId === r.id}
+          >
+            {deletingId === r.id ? 'Eliminando...' : 'Eliminar'}
+          </button>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Proveedores</h2>
-      <form onSubmit={add} className="card p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          placeholder="Nombre"
-          disabled={submitting}
-          className="rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
-        />
-        <input
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          placeholder="Email (opcional)"
-          type="email"
-          disabled={submitting}
-          className="rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
-        />
-        <div className="flex items-center justify-end">
-          <Button type="submit" disabled={submitting}>
-            {submitting ? 'Agregando...' : 'Agregar'}
-          </Button>
-        </div>
-      </form>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Proveedores</h2>
+        <Button onClick={openCreateModal}>Nuevo Proveedor</Button>
+      </div>
 
-      <Table columns={[{ key: 'name', header: 'Nombre' }, { key: 'email', header: 'Email' }]} data={state.suppliers} />
+      <Table columns={columns} data={state.suppliers} />
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={editingSupplier ? 'Editar proveedor' : 'Crear proveedor'}
+        footer={<Button onClick={() => setOpen(false)} variant="outline">Cerrar</Button>}
+      >
+        <form className="space-y-3" onSubmit={submit}>
+          <div>
+            <label className="text-sm">Nombre *</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Nombre"
+              disabled={submitting}
+              className="w-full rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
+            />
+          </div>
+          <div>
+            <label className="text-sm">Email (opcional)</label>
+            <input
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="Email"
+              type="email"
+              disabled={submitting}
+              className="w-full rounded-xl border px-3 py-2 text-sm border-zinc-300 dark:bg-zinc-900 dark:border-zinc-700 disabled:opacity-50"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? 'Guardando...' : 'Guardar'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
